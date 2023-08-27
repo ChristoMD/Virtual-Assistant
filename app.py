@@ -11,9 +11,9 @@ from characterai import PyCAI
 load_dotenv()
 openai.api_key = os.getenv('OPENAI_API_KEY')
 elevenlabs_key = os.getenv('ELEVENLABS_API_KEY')
-
 client = PyCAI(os.getenv('CHARACTERAI_API_KEY'))
-client.start()
+
+
 
 app = Flask(__name__)
 
@@ -42,8 +42,12 @@ def audio():
     result = ""
     for choice in response.choices:
         result += choice.message.content'''
-    character_id = 'oL2IzOD15_wBIP_o6NAWDwiVyAnzz_3aGLu9aU7i254'
     
+    
+    client.start()
+
+    character_id = "oL2IzOD15_wBIP_o6NAWDwiVyAnzz_3aGLu9aU7i254"
+
     chat = client.chat.get_chat(character_id)
 
     participants = chat['participants']
