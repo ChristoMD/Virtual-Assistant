@@ -6,10 +6,14 @@ import requests
 #from transcriber import Transcriber
 from gtts import gTTS
 from playsound import playsound
+from characterai import PyCAI
 
 load_dotenv()
 openai.api_key = os.getenv('OPENAI_API_KEY')
 elevenlabs_key = os.getenv('ELEVENLABS_API_KEY')
+
+client = PyCAI('TOKEN')
+client.start()
 
 app = Flask(__name__)
 
