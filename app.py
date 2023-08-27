@@ -29,6 +29,7 @@ def audio():
     audio_file = open("audio.mp3", "rb")
     #text = Transcriber().transcribe(audio)
     transcribed = openai.Audio.transcribe("whisper-1", audio_file)
+    print(transcribed.text)
 
 
     '''response = openai.ChatCompletion.create(
