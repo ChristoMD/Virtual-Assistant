@@ -12,7 +12,7 @@ load_dotenv()
 openai.api_key = os.getenv('OPENAI_API_KEY')
 elevenlabs_key = os.getenv('ELEVENLABS_API_KEY')
 
-client = PyCAI('TOKEN')
+client = PyCAI(os.getenv('CHARACTERAI_API_KEY'))
 client.start()
 
 app = Flask(__name__)
@@ -30,7 +30,8 @@ def audio():
     #text = Transcriber().transcribe(audio)
     transcribed = openai.Audio.transcribe("whisper-1", audio_file)
 
-    response = openai.ChatCompletion.create(
+
+    '''response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo-0613",
         messages=[
             {"role": "system", "content": "You are a foul-mouthed assistant."},
@@ -39,8 +40,26 @@ def audio():
     )
     result = ""
     for choice in response.choices:
-        result += choice.message.content
+        result += choice.message.content'''
+    character_id = 'oL2IzOD15_wBIP_o6NAWDwiVyAnzz_3aGLu9aU7i254'
     
+    chat = client.chat.get_chat(character_id)
+
+    participants = chat['participants']
+
+    if not participants[0]['is_human']:
+        tgt = participants[0]['user']['username']
+    else:
+        tgt = participants[1]['user']['username']
+
+
+    message = transcribed.text
+    data = client.chat.send_message(
+        chat['external_id'], tgt, message
+    )
+    namec = data['src_char']['participant']['name']
+    textoutput = data['replies'][0]['text']
+    print(f"{namec}: {textoutput}")
 
     #tts = gTTS(result, lang='es', tld = 'com.mx')
     #tts.save("response.mp3")
@@ -55,7 +74,7 @@ def audio():
     }
 
     data = {
-        "text": result,
+        "text": textoutput,
         "model_id": "eleven_multilingual_v1",
         "voice_settings": {
             "stability": 0.55,
@@ -71,4 +90,4 @@ def audio():
 
     playsound("output.mp3")
 
-    return {"result": "ok", "text": result}
+    return {"result": "ok", "text": textoutput}
