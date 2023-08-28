@@ -7,92 +7,120 @@ import requests
 from gtts import gTTS
 from playsound import playsound
 from characterai import PyCAI
+#################################################
+import asyncio
+from typing import List, Optional
+
+from boilerplate import API
+from novelai_api.BanList import BanList
+from novelai_api.BiasGroup import BiasGroup
+from novelai_api.GlobalSettings import GlobalSettings
+from novelai_api.Preset import PREAMBLE, Model, Preset
+from novelai_api.Tokenizer import Tokenizer
+from novelai_api.utils import b64_to_tokens
 
 load_dotenv()
 openai.api_key = os.getenv('OPENAI_API_KEY')
 elevenlabs_key = os.getenv('ELEVENLABS_API_KEY')
-client = PyCAI(os.getenv('CHARACTERAI_API_KEY'))
+
+async def main():
+    async with API() as api_handler:
+        api = api_handler.api
+        logger = api_handler.logger
+
+        # model = Model.Sigurd
+        # model = Model.Euterpe
+        # model = Model.Krake
+        model = Model.Clio
+
+        # NOTE: plain text prompt
+        prompt = PREAMBLE[model]
+        # NOTE: prompt encoded in tokens
+        # prompt = Tokenizer.encode(model, PREAMBLE[model])
+
+        # NOTE: empty preset
+        preset = Preset("preset", model, {})
+        # NOTE: instantiation from default (presets/presets_6B_v4/default.txt)
+        # preset = Preset.from_default(model)
+        # NOTE: instantiation from official file (presets/presets_6B_v4)
+        # preset = Preset.from_official(model, "Storywriter")
+        # NOTE: instantiation from file
+        # preset = Preset.from_file("novelai_api/presets/presets_6B_v4/Storywriter.txt")
+        # NOTE: instantiation of a new reset
+        # preset = Preset("new preset", model)
+        # NOTE: modification of the preset
+        preset.min_length = 1
+        preset.max_length = 30
+
+        # NOTE: instantiate with arguments
+        global_settings = GlobalSettings(num_logprobs=GlobalSettings.NO_LOGPROBS)
+        # NOTE: change arguments after instantiation
+        global_settings.bias_dinkus_asterism = True
+        global_settings.rep_pen_whitelist = True
+
+        # NOTE: no ban list
+        bad_words: Optional[BanList] = None
+        # NOTE: empty ban list
+        # bad_words = BanList()
+        # NOTE: ban list with elements in it
+        # bad_words = BanList(" cat", " dog", " boy")
+        # NOTE: disabled ban list with elements in it
+        # bad_words = BanList(" cat", " dog", " boy", enabled = False)
+        # NOTE: add elements to the bias list
+        if bad_words is not None:
+            bad_words.add(" man", " Man", " father")
+            bad_words += " Father"
+
+        bias_groups: List[BiasGroup] = []
+        # NOTE: bias group with a strength of 0.15
+        bias_group1 = BiasGroup(0.15)
+        # NOTE: bias group with a strength of 0.05
+        bias_group2 = BiasGroup(0.05)
+        # NOTE: add the bias groups to the bias group list
+        # bias_groups.extend([bias_group1, bias_group2])
+        # NOTE: add tokens to the bias groups
+        if bias_groups:
+            bias_group1.add("very", " very", " slightly", " incredibly", " enormously", " loudly")
+            bias_group1 += " proverbially"
+            bias_group2 += " interestingly"
+            bias_group2 += " brutally"
+
+        # NOTE: no module
+        module = None
+        # NOTE: Official module - CrossGenre module (module names can be found in the network tab)
+        #       A full list can be found [here](docs/source/novelai_api/Full_list_of_modules.md)
+        # module = "general_crossgenre"
+        # NOTE: Custom module (Sage's Mass Effect v2) - ids can be retrieved from download_user_modules() or a scenario
+        # module = "6B-v4:c6021aaa523e2dcb8588848b5fd4e2516dd4bb7107268aaa6050b5430c3a4b47:"
+        #          "b764a71f139d0d829ed0f3077f026db43fdb25bc6b45ac508e85dd4c405a2fae"
+
+        #prompt = "Hi I'm Chris, what is your name?"
+
+        # NOTE: normal generation
+        gen = await api.high_level.generate(prompt, model, preset, global_settings, bad_words, bias_groups, module)
+        # NOTE: b64-encoded list of tokens ids
+        logger.info(gen["output"])
+        # NOTE: list of token ids
+        logger.info(b64_to_tokens(gen["output"]))
+        # NOTE: decoded response
+        logger.info(Tokenizer.decode(model, b64_to_tokens(gen["output"])))
+
+        # NOTE: streamed generation
+        async for token in api.high_level.generate_stream(
+            prompt, model, preset, global_settings, bad_words, bias_groups, module
+        ):
+            logger.info(
+                "%s  %s  '%s'",
+                # NOTE: b64-encoded token id
+                token["token"],
+                # NOTE: token id
+                b64_to_tokens(token["token"]),
+                # NOTE: decoded token
+                Tokenizer.decode(model, b64_to_tokens(token["token"])),
+            )
+
+        # ... and more examples can be found in tests/test_generate.py
 
 
-
-app = Flask(__name__)
-
-@app.route("/")
-def index():
-    return render_template("recorder.html")
-
-@app.route("/audio", methods=["POST"])
-def audio():
-    #Obtener audio grabado y transcribirlo
-    audio = request.files.get("audio")
-    audio.save("audio.mp3")
-    audio_file = open("audio.mp3", "rb")
-    #text = Transcriber().transcribe(audio)
-    transcribed = openai.Audio.transcribe("whisper-1", audio_file)
-    print(transcribed.text)
-
-
-    '''response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo-0613",
-        messages=[
-            {"role": "system", "content": "You are a foul-mouthed assistant."},
-            {"role": "user", "content": transcribed.text}
-        ],
-    )
-    result = ""
-    for choice in response.choices:
-        result += choice.message.content'''
-    
-    
-    client.start()
-
-    character_id = "oL2IzOD15_wBIP_o6NAWDwiVyAnzz_3aGLu9aU7i254"
-
-    chat = client.chat.get_chat(character_id)
-
-    participants = chat['participants']
-
-    if not participants[0]['is_human']:
-        tgt = participants[0]['user']['username']
-    else:
-        tgt = participants[1]['user']['username']
-
-
-    message = transcribed.text
-    data = client.chat.send_message(
-        chat['external_id'], tgt, message
-    )
-    namec = data['src_char']['participant']['name']
-    textoutput = data['replies'][0]['text']
-    print(f"{namec}: {textoutput}")
-
-    #tts = gTTS(result, lang='es', tld = 'com.mx')
-    #tts.save("response.mp3")
-    #playsound("response.mp3")
-
-    CHUNK_SIZE = 1024
-    url = "https://api.elevenlabs.io/v1/text-to-speech/oWAxZDx7w5VEj9dCyTzz"
-    headers = {
-        "Accept": "audio/mpeg",
-        "Content-Type": "application/json",
-        "xi-api-key": elevenlabs_key
-    }
-
-    data = {
-        "text": textoutput,
-        "model_id": "eleven_multilingual_v1",
-        "voice_settings": {
-            "stability": 0.55,
-            "similarity_boost": 0.55
-        }
-    }
-    response = requests.post(url, json=data, headers=headers, stream=True)
-
-    with open('output.mp3', 'wb') as f:
-        for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
-            if chunk:
-                f.write(chunk)
-
-    playsound("output.mp3")
-
-    return {"result": "ok", "text": textoutput}
+if __name__ == "__main__":
+    asyncio.run(main())
